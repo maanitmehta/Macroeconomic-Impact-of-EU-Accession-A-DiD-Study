@@ -1,0 +1,137 @@
+# ============================================================
+# Data Collection: EU Accession DiD Study
+# Author: Maanit Mehta
+# MSc Financial Modelling & Investment, University of Glasgow
+# Description: Pulls macroeconomic panel data from World Bank
+#              WDI API for 23 countries (1995-2022)
+# ============================================================
+
+# Install and load required packages
+if (!require("WDI")) install.packages("WDI")
+if (!require("dplyr")) install.packages("dplyr")
+if (!require("tidyr")) install.packages("tidyr")
+if (!require("haven")) install.packages("haven")
+
+library(WDI)
+library(dplyr)
+library(tidyr)
+library(haven)
+
+# ============================================================
+# COUNTRY SAMPLE
+# ============================================================
+
+# Treated countries (EU accession 2004, 2007, 2013)
+treated_2004 <- c("CY", "CZ", "EE", "HU", "LV", "LT", "MT", "PL", "SK", "SI")
+treated_2007 <- c("BG", "RO")
+treated_2013 <- c("HR")
+
+# Control countries (never treated during study period)
+control <- c("AL", "BA", "MK", "ME", "RS", "TR", "MD", "UA", "BY", "GE")
+
+all_countries <- c(treated_2004, treated_2007, treated_2013, control)
+
+# ============================================================
+# WDI INDICATOR CODES
+# ============================================================
+# NY.GDP.MKTP.KD.ZG = GDP Growth (annual %)
+# SL.UEM.TOTL.ZS    = Unemployment (% of total labour force)
+# FP.CPI.TOTL.ZG    = Inflation, CPI (annual %)
+# BN.CAB.XOKA.GD.ZS = Current account balance (% of GDP)
+# NE.EXP.GNFS.ZS    = Exports of goods and services (% of GDP)
+# NE.IMP.GNFS.ZS    = Imports of goods and services (% of GDP)
+# NE.GDI.TOTL.ZS    = Gross capital formation (% of GDP)
+# NE.CON.GOVT.ZS    = Government consumption expenditure (% of GDP)
+# PA.NUS.FCRF        = Official exchange rate (LCU per USD, period average)
+
+indicators <- c(
+  GDP_Growth              = "NY.GDP.MKTP.KD.ZG",
+  Unemployment            = "SL.UEM.TOTL.ZS",
+  Inflation               = "FP.CPI.TOTL.ZG",
+  Current_Account_Balance = "BN.CAB.XOKA.GD.ZS",
+  Exports                 = "NE.EXP.GNFS.ZS",
+  Imports                 = "NE.IMP.GNFS.ZS",
+  Gross_Capital_Formation = "NE.GDI.TOTL.ZS",
+  Government_Consumption  = "NE.CON.GOVT.ZS",
+  Exchange_Rate_USD       = "PA.NUS.FCRF"
+)
+
+# ============================================================
+# PULL DATA FROM WORLD BANK API
+# ============================================================
+
+cat("Pulling data from World Bank WDI API...\n")
+
+raw_data <- WDI(
+  country   = all_countries,
+  indicator = indicators,
+  start     = 1995,
+  end       = 2022,
+  extra     = TRUE   # includes region, income level, iso3c codes
+)
+
+cat("Data pulled successfully. Rows:", nrow(raw_data), "\n")
+
+# ============================================================
+# CLEAN AND RESHAPE
+# ============================================================
+
+panel_data <- raw_data %>%
+  select(
+    country_id = iso3c,
+    country_name = country,
+    year,
+    GDP_Growth,
+    Unemployment,
+    Inflation,
+    Current_Account_Balance,
+    Exports,
+    Imports,
+    Gross_Capital_Formation,
+    Government_Consumption,
+    Exchange_Rate_USD
+  ) %>%
+  filter(year >= 1995, year <= 2022) %>%
+  arrange(country_id, year)
+
+# ============================================================
+# ADD TREATMENT VARIABLES
+# ============================================================
+
+panel_data <- panel_data %>%
+  mutate(
+    accession_year = case_when(
+      country_id %in% c("CYP", "CZE", "EST", "HUN", "LVA",
+                         "LTU", "MLT", "POL", "SVK", "SVN") ~ 2004,
+      country_id %in% c("BGR", "ROU")                        ~ 2007,
+      country_id %in% c("HRV")                               ~ 2013,
+      TRUE                                                    ~ 0     # never treated
+    ),
+    Treated = if_else(accession_year > 0 & year >= accession_year, 1, 0),
+    Never_EU = if_else(accession_year == 0, 1, 0)
+  )
+
+cat("Treatment variables added.\n")
+cat("Treated obs:", sum(panel_data$Treated), "\n")
+cat("Control country obs:", sum(panel_data$Never_EU * 1), "\n")
+
+# ============================================================
+# SUMMARY STATISTICS
+# ============================================================
+
+cat("\n--- Summary Statistics ---\n")
+summary(panel_data[, c("GDP_Growth", "Unemployment", "Inflation",
+                        "Exports", "Imports", "Gross_Capital_Formation",
+                        "Government_Consumption", "Current_Account_Balance",
+                        "Exchange_Rate_USD")])
+
+# ============================================================
+# EXPORT TO STATA .dta FORMAT
+# ============================================================
+
+output_path <- "data/eupanel.dta"
+write_dta(panel_data, output_path)
+cat("\nData saved to:", output_path, "\n")
+cat("Rows:", nrow(panel_data), "| Columns:", ncol(panel_data), "\n")
+cat("Countries:", n_distinct(panel_data$country_id), "\n")
+cat("Years: 1995 to 2022\n")
