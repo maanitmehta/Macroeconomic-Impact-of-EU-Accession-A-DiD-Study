@@ -1,0 +1,544 @@
+********************************************************************************
+* Stata Do-File: EU Accession — Dynamic DiD Event Study Analysis
+* Author:        Maanit Mehta
+* Affiliation:   MSc Financial Modelling & Investment, University of Glasgow
+* Supervisor:    Dr. Sisir Ramanan
+* Description:   Estimates cohort-specific ATETs for 9 macroeconomic indicators
+*                using xthdidregress (Stata 18). Generates event-study plots and
+*                coefficient beta/SE plots by accession cohort (2004, 2007, 2013).
+* Data:          eupanel.dta (generated from scripts/R/data_collection.R)
+********************************************************************************
+
+clear all
+set more off
+
+* Install required packages (run once)
+* ssc install coefplot, replace
+
+eststo clear
+
+********************************************************************************
+* 1. SETUP — SET WORKING DIRECTORY AND LOAD DATA
+********************************************************************************
+
+* Update path to your local directory containing eupanel.dta
+cd "/Users/maanitmehta/Downloads/"
+use "eupanel.dta", clear
+
+* Set output directory for graphs
+local graphdir "/Users/maanitmehta/Desktop/goodstata/graphs"
+cd "`graphdir'"
+
+* Initial data check
+summarize
+
+********************************************************************************
+* 2. PANEL SETUP — ENCODE COUNTRY IDs AND DECLARE PANEL STRUCTURE
+********************************************************************************
+
+* Generate numeric country identifier for tsset
+generate country = 1
+replace country = 2  if country_id == "CYP"   // Cyprus
+replace country = 3  if country_id == "CZE"   // Czech Republic
+replace country = 4  if country_id == "EST"   // Estonia
+replace country = 5  if country_id == "HRV"   // Croatia (2013)
+replace country = 6  if country_id == "HUN"   // Hungary
+replace country = 7  if country_id == "LTU"   // Lithuania
+replace country = 8  if country_id == "LVA"   // Latvia
+replace country = 9  if country_id == "MLT"   // Malta
+replace country = 10 if country_id == "POL"   // Poland
+replace country = 11 if country_id == "ROU"   // Romania (2007)
+replace country = 12 if country_id == "SVK"   // Slovakia
+replace country = 13 if country_id == "SVN"   // Slovenia
+replace country = 14 if country_id == "ALB"   // Albania (control)
+replace country = 15 if country_id == "BIH"   // Bosnia & Herz. (control)
+replace country = 16 if country_id == "MKD"   // North Macedonia (control)
+replace country = 17 if country_id == "MNE"   // Montenegro (control)
+replace country = 18 if country_id == "SRB"   // Serbia (control)
+replace country = 19 if country_id == "TUR"   // Turkey (control)
+replace country = 20 if country_id == "MDA"   // Moldova (control)
+replace country = 21 if country_id == "UKR"   // Ukraine (control)
+replace country = 22 if country_id == "BLR"   // Belarus (control)
+replace country = 23 if country_id == "GEO"   // Georgia (control)
+
+* Declare panel structure
+tsset country year, yearly
+
+* Generate event time (years relative to accession)
+gen event_time = year - accession_year
+
+********************************************************************************
+* 3. HELPER PROGRAM — EXTRACT AND PLOT COHORT BETA COEFFICIENTS
+* Description: Extracts rows 1 (ATET) and 2 (SE) from r(table) matrix,
+*              plots beta and SE by cohort (2004, 2007, 2013) across years.
+********************************************************************************
+
+* This block is repeated per indicator — matrix extraction approach:
+* temp[1, 1..20]  = 2004 cohort ATETs
+* temp[1, 21..40] = 2007 cohort ATETs
+* temp[1, 41..60] = 2013 cohort ATETs
+* Row 2 = standard errors
+
+********************************************************************************
+* 4. MAIN ANALYSIS — INDIVIDUAL OUTCOME INDICATORS
+********************************************************************************
+
+* --- 4.1 IMPORTS ---
+eststo: xthdidregress ra (Imports) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(Imports, replace)
+graph combine Imports, title("Imports") saving("Imports.gph", replace)
+graph export "`graphdir'/jpg/Imports.jpg", as(jpg) quality(100) replace
+
+* Extract and plot beta coefficients by cohort
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Imports - Beta (Estimated Treatment Effect)") ///
+       ytitle("ATET") xtitle("Year")
+graph export "Imports_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* Extract and plot standard errors by cohort
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Imports - Standard Error") ///
+       ytitle("S.E.") xtitle("Year")
+graph export "Imports_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* --- 4.2 EXPORTS ---
+eststo: xthdidregress ra (Exports) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(Exports, replace)
+graph combine Exports, title("Exports") saving("Exports.gph", replace)
+
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Exports - Beta (Estimated Treatment Effect)") ///
+       ytitle("ATET") xtitle("Year")
+graph export "Exports_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Exports - Standard Error") ///
+       ytitle("S.E.") xtitle("Year")
+graph export "Exports_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* --- 4.3 GROSS CAPITAL FORMATION ---
+eststo: xthdidregress ra (Gross_Capital_Formation) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(Gross_Capital_Formation, replace)
+graph combine Gross_Capital_Formation, title("Gross Capital Formation") ///
+    saving("Gross_Capital_Formation.gph", replace)
+
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Gross Capital Formation - Beta") ytitle("ATET") xtitle("Year")
+graph export "Gross_Capital_Formation_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Gross Capital Formation - SE") ytitle("S.E.") xtitle("Year")
+graph export "Gross_Capital_Formation_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* --- 4.4 GDP GROWTH ---
+eststo: xthdidregress ra (GDP_Growth) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(GDP_Growth, replace)
+graph combine GDP_Growth, title("GDP Growth") saving("GDP_Growth.gph", replace)
+graph export "`graphdir'/jpg/GDP_Growth.jpg", as(jpg) quality(100) replace
+
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("GDP Growth - Beta") ytitle("ATET") xtitle("Year")
+graph export "GDP_Growth_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("GDP Growth - SE") ytitle("S.E.") xtitle("Year")
+graph export "GDP_Growth_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* --- 4.5 INFLATION ---
+eststo: xthdidregress ra (Inflation) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(Inflation, replace)
+graph combine Inflation, title("Inflation") saving("Inflation.gph", replace)
+graph export "`graphdir'/jpg/Inflation.jpg", as(jpg) quality(100) replace
+
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Inflation - Beta") ytitle("ATET") xtitle("Year")
+graph export "Inflation_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Inflation - SE") ytitle("S.E.") xtitle("Year")
+graph export "Inflation_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* --- 4.6 UNEMPLOYMENT ---
+eststo: xthdidregress ra (Unemployment) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(Unemployment, replace)
+graph combine Unemployment, title("Unemployment") saving("Unemployment.gph", replace)
+graph export "`graphdir'/jpg/Unemployment.jpg", as(jpg) quality(100) replace
+
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Unemployment - Beta") ytitle("ATET") xtitle("Year")
+graph export "Unemployment_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Unemployment - SE") ytitle("S.E.") xtitle("Year")
+graph export "Unemployment_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* --- 4.7 CURRENT ACCOUNT BALANCE ---
+eststo: xthdidregress ra (Current_Account_Balance) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(Current_Account_Balance, replace)
+graph combine Current_Account_Balance, title("Current Account Balance") ///
+    saving("Current_Account_Balance.gph", replace)
+graph export "`graphdir'/jpg/Current_Account_Balance.jpg", as(jpg) quality(100) replace
+
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Current Account Balance - Beta") ytitle("ATET") xtitle("Year")
+graph export "Current_Account_Balance_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Current Account Balance - SE") ytitle("S.E.") xtitle("Year")
+graph export "Current_Account_Balance_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* --- 4.8 EXCHANGE RATE ---
+eststo: xthdidregress ra (Exchange_Rate_USD) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(Exchange_Rate_USD, replace)
+graph combine Exchange_Rate_USD, title("Exchange Rate (USD)") ///
+    saving("Exchange_Rate_USD.gph", replace)
+graph export "`graphdir'/jpg/Exchange_Rate_USD.jpg", as(jpg) quality(100) replace
+
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Exchange Rate USD - Beta") ytitle("ATET") xtitle("Year")
+graph export "Exchange_Rate_USD_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Exchange Rate USD - SE") ytitle("S.E.") xtitle("Year")
+graph export "Exchange_Rate_USD_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+* --- 4.9 GOVERNMENT CONSUMPTION ---
+eststo: xthdidregress ra (Government_Consumption) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+
+matrix temp = r(table)
+estat aggregation, cohort
+estat aggregation, time
+estat atetplot, name(Government_Consumption, replace)
+graph combine Government_Consumption, title("Government Consumption") ///
+    saving("Government_Consumption.gph", replace)
+graph export "`graphdir'/jpg/Government_Consumption.jpg", as(jpg) quality(100) replace
+
+matrix b = J(20, 3, .)
+matrix colnames b = 2004 2007 2013
+matrix rownames b = 1996 1997 1998 1999 2000 2001 2002 2003 2004 ///
+                    2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[1, `i']
+    matrix b[`i', 2] = temp[1, 20+`i']
+    matrix b[`i', 3] = temp[1, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Government Consumption - Beta") ytitle("ATET") xtitle("Year")
+graph export "Government_Consumption_Beta.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+forval i = 1/20 {
+    matrix b[`i', 1] = temp[2, `i']
+    matrix b[`i', 2] = temp[2, 20+`i']
+    matrix b[`i', 3] = temp[2, 40+`i']
+}
+svmat double b
+twoway (line b1 year, sort lcolor(blue)) ///
+       (line b2 year, sort lcolor(red)) ///
+       (line b3 year, sort lcolor(green)), ///
+       legend(label(1 "2004") label(2 "2007") label(3 "2013")) ///
+       title("Government Consumption - SE") ytitle("S.E.") xtitle("Year")
+graph export "Government_Consumption_SE.jpg", as(jpg) quality(100) replace
+drop b1 b2 b3
+
+********************************************************************************
+* 5. HETEROGENEITY ANALYSIS — CROSS-INDICATOR ROBUSTNESS CHECKS
+********************************************************************************
+
+* Exports as treatment → Imports as outcome
+eststo: xthdidregress ra (Imports Exports) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+estat atetplot, name(Imports_on_Exports, replace)
+graph combine Imports_on_Exports, title("Exports on Imports") ///
+    saving("Imports_with_Exports.gph", replace)
+graph export "`graphdir'/jpg/Imports_with_Exports.jpg", as(jpg) quality(100) replace
+
+* Imports as treatment → Exports as outcome
+eststo: xthdidregress ra (Exports Imports) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+estat atetplot, name(Exports_on_Imports, replace)
+graph combine Exports_on_Imports, title("Imports on Exports") ///
+    saving("Exports_with_Imports.gph", replace)
+graph export "`graphdir'/jpg/Exports_with_Imports.jpg", as(jpg) quality(100) replace
+
+* Government Consumption → GDP Growth
+eststo: xthdidregress ra (Government_Consumption GDP_Growth) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+estat atetplot, name(GovCon_on_GDP, replace)
+graph combine GovCon_on_GDP, title("Government Consumption on GDP Growth") ///
+    saving("Government_Consumption_with_GDP_Growth.gph", replace)
+graph export "`graphdir'/jpg/Government_Consumption_with_GDP_Growth.jpg", ///
+    as(jpg) quality(100) replace
+
+* GDP Growth → Government Consumption
+eststo: xthdidregress ra (GDP_Growth Government_Consumption) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+estat atetplot, name(GDP_on_GovCon, replace)
+graph combine GDP_on_GovCon, title("GDP Growth on Government Consumption") ///
+    saving("GDP_Growth_with_Government_Consumption.gph", replace)
+graph export "`graphdir'/jpg/GDP_Growth_with_Government_Consumption.jpg", ///
+    as(jpg) quality(100) replace
+
+* Imports → GDP Growth
+eststo: xthdidregress ra (Imports GDP_Growth) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+estat atetplot, name(Imports_on_GDP, replace)
+graph combine Imports_on_GDP, title("Imports on GDP Growth") ///
+    saving("Imports_with_GDP_Growth.gph", replace)
+graph export "`graphdir'/jpg/Imports_with_GDP_Growth.jpg", as(jpg) quality(100) replace
+
+* Exports → GDP Growth
+eststo: xthdidregress ra (Exports GDP_Growth) (Treated), ///
+    group(country) cohortvar(accession_year, replace)
+estat atetplot, name(Exports_on_GDP, replace)
+graph combine Exports_on_GDP, title("Exports on GDP Growth") ///
+    saving("Exports_with_GDP_Growth.gph", replace)
+graph export "`graphdir'/jpg/Exports_with_GDP_Growth.jpg", as(jpg) quality(100) replace
+
+********************************************************************************
+* 6. FINAL OUTPUT TABLE
+********************************************************************************
+
+esttab, label
+
+********************************************************************************
+* END OF DO-FILE
+********************************************************************************
