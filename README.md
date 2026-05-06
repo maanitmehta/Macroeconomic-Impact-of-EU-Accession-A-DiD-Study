@@ -1,27 +1,27 @@
 # Macroeconomic Impact of EU Accession — A DiD Study
 
-A dynamic, staggered Difference-in-Differences event study examining how EU membership affected key macroeconomic outcomes across 13 new member states, relative to 10 non-member control countries, over 1995–2022.
-
-**University of Glasgow — MSc Financial Modelling & Investment**  
+**MSc Financial Modelling & Investment | University of Glasgow**  
 **Supervisor: Dr. Sisir Ramanan | Word Count: 9,249**
+
+A dynamic, staggered Difference-in-Differences event study examining the macroeconomic consequences of EU accession for new member states, using World Bank data spanning 1995–2022.
 
 ---
 
 ## What this project does
 
-- Estimates Average Treatment Effects on the Treated (ATET) for 9 macroeconomic indicators across EU accession cohorts (2004, 2007, 2013)
-- Applies a staggered DiD framework with country and year fixed effects to isolate accession effects from global shocks
-- Tests pre-treatment parallel trends visually and via event-study coefficient plots
-- Analyses cohort heterogeneity — comparing 2004, 2007, and 2013 entrants across all indicators
-- Conducts cross-indicator robustness checks (e.g. exports as treatment, imports as outcome) to validate spillover effects
+- Estimates Average Treatment Effects on the Treated (ATET) for 9 macroeconomic indicators across EU accession waves (2004, 2007, 2013)
+- Applies a staggered DiD design using `xthdidregress` in Stata 18 to accommodate heterogeneous treatment timing
+- Tests parallel trends assumptions via pre-treatment event-study coefficients
+- Conducts cohort-level heterogeneity analysis across the 2004, 2007, and 2013 enlargement waves
+- Runs cross-indicator robustness checks (e.g. exports as treatment, imports as outcome)
 
 ---
 
 ## Research Questions
 
 1. Does EU accession accelerate macroeconomic growth among new member states?
-2. How do indicators like exports, investment, and unemployment evolve in the years before and after EU membership?
-3. To what extent do economic effects vary across accession waves (2004, 2007, 2013)?
+2. How do key indicators evolve in the years preceding and following EU membership?
+3. To what extent do effects vary across different accession waves (2004, 2007, 2013)?
 
 ---
 
@@ -30,96 +30,104 @@ A dynamic, staggered Difference-in-Differences event study examining how EU memb
 | Source | Coverage |
 |--------|----------|
 | World Bank WDI (via `WDI` R package) | 1995–2022 |
-| 13 treated countries | 2004, 2007, 2013 cohorts |
-| 10 control countries | Albania, Bosnia, North Macedonia, Serbia, Turkey, Moldova, Ukraine, Belarus, Georgia, Montenegro |
+| 13 treated countries (EU accession 2004/2007/2013) | Cyprus, Czech Republic, Estonia, Hungary, Latvia, Lithuania, Malta, Poland, Slovakia, Slovenia, Bulgaria, Romania, Croatia |
+| 10 control countries (never treated) | Albania, Bosnia & Herzegovina, North Macedonia, Serbia, Turkey, Moldova, Ukraine, Belarus, Georgia, Montenegro |
 
-### Indicators
+---
 
-- Exports & Imports (% of GDP)
-- Gross Capital Formation (% of GDP)
-- GDP Growth (Annual %)
-- Unemployment (%)
-- Government Consumption (% of GDP)
-- Current Account Balance (% of GDP)
-- Inflation (CPI %)
-- Exchange Rate to USD
+## Indicators Analysed
+
+| Indicator | Unit |
+|-----------|------|
+| Government Consumption | % of GDP |
+| Exports | % of GDP |
+| Imports | % of GDP |
+| Gross Capital Formation | % of GDP |
+| GDP Growth | Annual % |
+| Unemployment | % |
+| Current Account Balance | % of GDP |
+| Inflation (CPI) | % |
+| Exchange Rate to USD | Local currency units |
 
 ---
 
 ## Methodology
 
-| Component | Description |
-|-----------|-------------|
-| Estimation Method | Dynamic Difference-in-Differences (Event Study) |
-| Specification | `xthdidregress` (Stata 18) |
-| Treatment Definition | EU Accession Year (2004, 2007, 2013) |
-| Control Group | 10 non-EU countries (never treated) |
-| Reference Year | k = −1 (year before accession) |
-| Event Time Window | ±10 years around accession |
-| Fixed Effects | Country and Year |
-| Standard Errors | Clustered at country level |
-| Software | R (`WDI` package for data), Stata (`xthdidregress` for estimation) |
+### Empirical Strategy
+
+Dynamic event-study Difference-in-Differences with staggered treatment adoption:
+
+```
+Y_it = α_i + λ_t + Σ β_k · D_{i,t+k} + ε_it
+```
+
+where:
+- `α_i` = country fixed effects
+- `λ_t` = year fixed effects
+- `D_{i,t+k}` = event-time indicators (k ∈ {−10, ..., +10}, k ≠ −1)
+- `β_k` = dynamic ATET coefficients of interest
+- Reference year: **k = −1** (one year before accession)
+
+### Tools
+
+| Component | Detail |
+|-----------|--------|
+| Estimation | `xthdidregress` (Stata 18) |
+| Data collection | `WDI` package (R) |
+| Fixed effects | Country + Year |
+| Standard errors | Clustered at country level |
+| Event window | 10 years before and after accession |
 
 ---
 
 ## Key Findings
 
-| Indicator | Observed Effect |
-|-----------|----------------|
-| Exports | Strong, persistent increase (~+7 pp by year 6); earlier cohorts benefit most |
-| Imports | Largest effect of all indicators (~+10 pp by year 8); reflects consumption convergence |
-| Gross Capital Formation | Delayed but substantial rise (~+4.5 pp by year 6); driven by structural fund absorption |
-| GDP Growth | J-shaped pattern — initial dip, then strong recovery (~+4.5 pp by year 7) |
-| Government Consumption | Sustained decline (~−2.5 pp by year 5); consistent with Maastricht fiscal discipline |
-| Unemployment | Gradual post-accession decline (−2.2 pp by year 9) after initial adjustment |
-| Current Account Balance | No consistent directional effect; offsetting trade flows dominate |
-| Inflation | Mild disinflation trend; high volatility limits inference |
-| Exchange Rate (USD) | No systematic accession effect; dominated by global factors |
+| Indicator | Direction | Timing | Cohort Heterogeneity |
+|-----------|-----------|--------|----------------------|
+| Exports | ↑ +7 pp | Immediate | Stronger for 2004 cohort |
+| Imports | ↑ +10 pp | Immediate | Strongest overall effect |
+| Gross Capital Formation | ↑ +4.5 pp | Lagged (~year 3) | Driven by structural funds |
+| Government Consumption | ↓ −2.5 pp | Persistent from year 3 | Earlier cohorts more pronounced |
+| GDP Growth | ↑ +4.5 pp | J-shaped (year 4+) | 2004 cohort largest premium |
+| Unemployment | ↓ −2.2 pp | Delayed (year 5+) | Gradual structural improvement |
+| Current Account Balance | ≈ 0 | No consistent effect | Dominated by offsetting flows |
+| Inflation | ↓ slight | Cohort-specific | Most clear for 2004 cohort |
+| Exchange Rate (USD) | ≈ 0 | No systematic effect | Driven by global factors |
 
 ---
 
-## Cohort Heterogeneity
+## Cohort Heterogeneity Summary
 
-Earlier entrants consistently achieved **faster and larger** post-accession gains across nearly all indicators:
-
-- **2004 cohort** — strongest effects on trade, investment, and growth; benefited from favourable global conditions and high institutional readiness
-- **2007 cohort** — similar patterns with slight delays; partially confounded by the global financial crisis
-- **2013 cohort** — most muted effects; post-crisis entry environment and more limited observation window
+Earlier accession cohorts consistently achieved larger and faster post-accession gains across trade, investment, growth, and labour market indicators. The 2013 cohort (Croatia) showed the most muted responses, likely reflecting post-crisis entry conditions and lower structural readiness.
 
 ---
 
 ## Policy Implications
 
-The findings are directly relevant to ongoing EU enlargement discussions involving **Ukraine, Moldova, and the Western Balkans**:
-
-- Institutional and economic preparedness at the point of entry significantly shapes the speed and magnitude of post-accession benefits
-- Structural fund absorption capacity matters — countries should invest in administrative and investment infrastructure ahead of entry
-- EU enlargement policy should adopt a **differentiated** approach, tailoring conditionality and technical assistance to each candidate's readiness
-
----
-
-## Limitations
-
-- Accession timing may be endogenous to economic readiness
-- EU candidacy may influence control group countries through anticipatory reforms
-- The model assumes no spillovers between treated and control units
-- Results are context-specific to the EU and may not generalise to other integration frameworks
+- **Candidate countries** (Ukraine, Moldova, Western Balkans): institutional and trade readiness at point of entry shapes both speed and magnitude of benefits
+- **EU policymakers**: enlargement conditionality and structural fund allocation should be tailored to the economic maturity of each candidate
+- **International integration**: EU accession offers transferable lessons for other blocs (ASEAN, AfCFTA), particularly around deep institutional alignment
 
 ---
 
 ## Repository Structure
 
 ```
-├── data/               # Raw and cleaned WDI panel data (R)
-├── scripts/            # Data collection, cleaning, and Stata DiD estimation
-├── results/            # Event-study coefficient plots and regression tables
+├── data/               # Raw and processed WDI panel data
+├── scripts/
+│   ├── R/              # Data collection via WDI package
+│   └── stata/          # xthdidregress estimation & event study plots
+├── results/            # Coefficient plots and regression output tables
 └── README.md
 ```
 
 ---
 
-## About
+## References
 
-**Maanit Mehta**  
-MSc Financial Modelling & Investment, University of Glasgow  
-Adam Smith Business School
+Key methodological references:
+- Callaway & Sant'Anna (2021) — DiD with multiple time periods
+- Goodman-Bacon (2021) — DiD with variation in treatment timing
+- de Chaisemartin & D'Haultfœuille (2020) — Two-way FE with heterogeneous effects
+
+Full bibliography available in the dissertation.
